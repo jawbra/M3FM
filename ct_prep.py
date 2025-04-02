@@ -1,29 +1,67 @@
-import numpy as np
-import torch
-from util import txt2embed, get_sincos_size_embed
 from monai.data import Dataset
 from torch.utils.data import DataLoader
 from monai import transforms
 from monai.transforms import MapTransform
 import torch
 import numpy as np
-from monai.transforms import MapTransform
+from util import txt2embed, get_sincos_size_embed
 import json
 
-class ExtractPixelSpacingd(MapTransform):
-    def __init__(self, keys, allow_missing_keys=False):
+
+class DefineEmbedDim(MapTransform):
+    def __init__(self, keys, embed_dim=1024, allow_missing_keys=False):
         super().__init__(keys, allow_missing_keys)
+        self.embed_dim = embed_dim
     
     def __call__(self, data):
         d = dict(data)
         # Get spacing from image metadata
-        if "image_meta_dict" in d:
-            spacing = d["image_meta_dict"].get("spacing", [1.0, 1.0, 1.0])
-            # MONAI loader returns spacing as (w, h, d), we need (d, h, w)
-            d["pixel_size"] = [spacing[2], spacing[1], spacing[0]] # here spacing is adjusted, since we reorient the image later in transfomrs by calling transforms.Orientationd
+        d['embed_dim'] = self.embed_dim
         return d
     
-class Add(MapTransform):
+    
+class ClinicalText(MapTransform):
+    def __init__(self, keys, question='', clinical_text='', data_name='', allow_missing_keys=False):
+        super().__init__(keys, allow_missing_keys)
+        self.question = question
+        self.clinical_text = clinical_text
+        self.data_name = data_name
+        self.data_name_list = []
+    
+    def __call__(self, data):
+        d = dict(data)
+        # Get spacing from image metadata
+        question_ids, question_masks = txt2embed(self.question)
+        txt_ids, txt_masks = txt2embed(self.clinical_text, max_length=160)
+        self.data_name_list.append(self.data_name)
+
+        d['questions'] = self.question,
+        d['txt_ids'] = txt_ids
+        d['txt_mask'] = txt_masks
+        d['clinical_txt'] = self.clinical_text
+        d['questions_ids'] = question_ids
+        d['questions_mask'] = question_masks
+
+        return d
+    
+class SizeEmbed(MapTransform):
+    def __init__(self, keys, patch_size=[16, 16, 16], allow_missing_keys=False):
+        super().__init__(keys, allow_missing_keys)
+        self.patch_size = patch_size
+    
+    def __call__(self, data):
+        d = dict(data)
+        # Get spacing from image metadata
+        d["patch_size"] = self.patch_size
+        pix_size = d['pixel_size']
+        embed_dim = d["embed_dim"]
+        sizes = np.array([[pix_size[0] * self.patch_size[0], pix_size[1] * self.patch_size[1], pix_size[2] * self.patch_size[2]]])
+        size_embed = get_sincos_size_embed(embed_dim, sizes)
+        #size_embed = torch.from_numpy(size_embed).to(torch.float32)
+        d['size_embed'] = size_embed
+        return d
+
+class ExtractPixelSpacingd(MapTransform):
     def __init__(self, keys, allow_missing_keys=False):
         super().__init__(keys, allow_missing_keys)
     
@@ -126,116 +164,15 @@ class CropResized(MapTransform):
                 d[key] = img_transformed[None]  # Add channel dimension back
                 #d['pixel_size'] = new_pix_size
                 d['coords'] = {'cancer_risk': coords}
+                d['data_size'] = self.crop_size
                 
         return d
 
 
 
-def normalize(x, data_min, data_max):
-    x = [np.clip(xi, data_min, data_max) for xi in x]
-    x = [(xi - data_min) / (data_max - data_min) for xi in x]
-    x = [xi * 2 - 1 for xi in x]
-    return x
-
-
-def to_tensor(x):
-    assert isinstance(x, list)
-    return [torch.from_numpy(xi.copy()).unsqueeze(0) for xi in x]
-
-
-def crop_resize(x, coord, pix_size, crop_size):
-    s, h, w = x.shape
-    ts, th, tw = crop_size
-
-    sl = coord[1] - coord[0]
-    hl = coord[3] - coord[2]
-    wl = coord[5] - coord[4]
-
-    cs = ts
-    ch = th
-    cw = tw
-
-    if sl < cs:
-        ms = (cs - sl) // 2
-        ss = max(0, coord[0] - ms)
-        se = min(s, coord[1] + ms)
-    else:
-        ss = coord[0]
-        se = coord[1]
-
-    if hl < ch:
-        mh = (ch - hl) // 2
-        hs = max(0, coord[2] - mh)
-        he = min(h, coord[3] + mh)
-    else:
-        hs = coord[2]
-        he = coord[3]
-
-    if wl < cw:
-        mw = (cw - wl) // 2
-        ws = max(0, coord[4] - mw)
-        we = min(w, coord[5] + mw)
-    else:
-        ws = coord[4]
-        we = coord[5]
-
-    x = x[ss:se, hs:he, ws:we]
-
-    ps = pix_size[0] * cs / ts
-    ph = pix_size[1] * ch / th
-    pw = pix_size[2] * cw / tw
-
-    x = torch.nn.functional.interpolate(
-        torch.from_numpy(x).unsqueeze(0).unsqueeze(0).to(torch.float32),
-        size=(ts, th, tw),
-        mode="trilinear",
-        align_corners=False,
-    ).numpy().squeeze()
-
-    return x, [ps, ph, pw]
-
-
-
-
-def get_data(input_dict, args):
-
-    pix_size = input_dict['pixel_size']
-    ct_path = input_dict['ct_path']
-    data_name = args.data_name
-    coords = input_dict['coords'][data_name[0]]
-    crop_size = args.crop_size
-    patch_size = args.cube_size
-    hu_range = args.hu_range
-    embed_dim = args.embed_dim
-    question = input_dict['question']
-    clinical_txt = input_dict['clinical_txt']
-
-    data_ori = np.load(ct_path)
-    data, pix_size = crop_resize(data_ori, coords, pix_size, crop_size)
-
-    data = normalize([data], hu_range[0], hu_range[1])[0]
-    data = to_tensor([data])[0]
-
-    sizes = np.array([[pix_size[0] * patch_size[0], pix_size[1] * patch_size[1], pix_size[2] * patch_size[2]]])
-    size_embed = get_sincos_size_embed(embed_dim, sizes)
-    size_embed = torch.from_numpy(size_embed).to(torch.float32)
-
-    question_ids, question_masks = txt2embed(question)
-    question_ids = torch.LongTensor(question_ids).unsqueeze(0)
-    question_masks = torch.LongTensor(question_masks).unsqueeze(0)
-
-    txt_ids, txt_masks = txt2embed(clinical_txt, max_length=160)
-    txt_ids = torch.LongTensor(txt_ids).unsqueeze(0)
-    txt_masks = torch.LongTensor(txt_masks).unsqueeze(0)
-    data_dict = {'data': data.unsqueeze(0), 'questions': question,
-                 'questions_ids': question_ids.unsqueeze(0), 'questions_mask': question_masks.unsqueeze(0),
-                 'data_size': torch.LongTensor(crop_size).unsqueeze(0),
-                 'txt_ids': txt_ids.unsqueeze(0), 'txt_mask': txt_masks.unsqueeze(0),
-                 'size_embed': size_embed.unsqueeze(0), "clinical_txt": clinical_txt,
-                 'patch_size': patch_size,
-                 'data_name': [data_name]}
-
-    return data_dict
+# # Define the dataset and dataloader
+# data_dict =[{'image': '/home/brandtj/Documents/projects/iderha/M3FM/nlst_data/dicom/100012/1.2.840.113654.2.55.240231128564881525363489796879328810792',
+#     'mask': '/home/brandtj/Documents/projects/iderha/M3FM/nlst_data/masks/100012/1.2.840.113654.2.55.240231128564881525363489796879328810792/1.2.840.113654.2.55.240231128564881525363489796879328810792.nii.gz'},]
 
 
 def get_dataloader(input_dict, args):
@@ -245,13 +182,16 @@ def get_dataloader(input_dict, args):
         transforms.EnsureChannelFirstd(keys=['image', 'mask'], allow_missing_keys=True),
         transforms.Orientationd(keys=["image", "mask"], allow_missing_keys=True, axcodes="RAI"),
         transforms.Transposed(keys=["image", "mask"], indices=(0, 3, 1, 2), allow_missing_keys=True),
+        DefineEmbedDim(keys=['image'], embed_dim=1024, allow_missing_keys=True),
+        SizeEmbed(keys=['image'], allow_missing_keys=True),
+        ClinicalText(keys=['image'], question='Predict the lung cancer risk over six years.', clinical_text='No patient information available.', data_name='cancer_risk', allow_missing_keys=True),
         transforms.Rotate90d(keys=["image", "mask"], k=1, spatial_axes=(1,2), allow_missing_keys=True),
         transforms.ScaleIntensityRanged(keys=['image'], a_min=-1300, a_max=150, b_min=-1.0, b_max=1.0, clip=True),
         # transforms.CropForegroundd(keys=['image', 'mask'], source_key='mask', margin=0),
         # transforms.Resized(keys=['image', 'mask'], spatial_size=(128,320,448)),
-        CropResized(keys=['image', 'mask'], crop_size=(128, 448, 320), lung='left'),
+        CropResized(keys=['image', 'mask'], crop_size=(128, 448, 320), lung=args.lung_side),
         #transforms.Rotate90d(keys=["image", "mask"], k=1, spatial_axes=(1,2), allow_missing_keys=True),
-        transforms.ToTensord(keys=['image', 'mask'], allow_missing_keys=True),
+        transforms.ToTensord(keys=['image', 'mask', 'questions_ids', 'questions_mask', 'txt_ids', 'txt_mask', 'data_size'], allow_missing_keys=True),
     ])
 
 
@@ -264,10 +204,46 @@ def get_dataloader(input_dict, args):
     return loader, input_dict
 
 
-    # data_dict = {'data': data.unsqueeze(0), 'questions': question,
-    #              'questions_ids': question_ids.unsqueeze(0), 'questions_mask': question_masks.unsqueeze(0),
-    #              'data_size': torch.LongTensor(crop_size).unsqueeze(0),
-    #              'txt_ids': txt_ids.unsqueeze(0), 'txt_mask': txt_masks.unsqueeze(0),
-    #              'size_embed': size_embed.unsqueeze(0), "clinical_txt": clinical_txt,
-    #              'patch_size': patch_size,
-    #              'data_name': [data_name]}
+
+# train_transforms = transforms.Compose([
+#     transforms.LoadImaged(keys=['image', 'mask'], allow_missing_keys=True, meta_key_postfix="meta_dict", image_only=False),
+#     ExtractPixelSpacingd(keys=['image']),  # Extract pixel spacing after loading
+#     transforms.EnsureChannelFirstd(keys=['image', 'mask'], allow_missing_keys=True),
+#     transforms.Orientationd(keys=["image", "mask"], allow_missing_keys=True, axcodes="RAI"),
+#     transforms.Transposed(keys=["image", "mask"], indices=(0, 3, 1, 2), allow_missing_keys=True),
+#     DefineEmbedDim(keys=['image'], embed_dim=1024, allow_missing_keys=True),
+#     SizeEmbed(keys=['image'], allow_missing_keys=True),
+#     ClinicalText(keys=['image'], question='Predict the lung cancer risk over six years.', clinical_text='No patient information available.', data_name=['cancer_risk'],allow_missing_keys=True),
+#     transforms.Rotate90d(keys=["image", "mask"], k=1, spatial_axes=(1,2), allow_missing_keys=True),
+#     transforms.ScaleIntensityRanged(keys=['image'], a_min=-1300, a_max=150, b_min=-1.0, b_max=1.0, clip=True),
+#     # transforms.CropForegroundd(keys=['image', 'mask'], source_key='mask', margin=0),
+#     # transforms.Resized(keys=['image', 'mask'], spatial_size=(128,320,448)),
+#     CropResized(keys=['image', 'mask'], crop_size=(128, 448, 320), lung='left'),
+#     #transforms.Rotate90d(keys=["image", "mask"], k=1, spatial_axes=(1,2), allow_missing_keys=True),
+#     transforms.ToTensord(keys=['image', 'mask', 'questions_ids', 'question_mask', 'txt_ids', 'txt_mask'], allow_missing_keys=True),
+# ])
+
+# data = Dataset(data=data_dict, transform=train_transforms)
+# loader = DataLoader(data, batch_size=1)
+
+
+# batch = next(iter(loader))
+# np.save('test.npy',batch['image'][0,0,:,:,:])
+# np.save('test_mask.npy',batch['mask'][0,0,:,:,:])
+# print('stop')
+
+
+#find dicom through dataset path
+
+#compute box for lung
+
+#run inference with this template
+
+# input_data = {
+#     'ct_path': 'demo_data/ct_npy/cancer_risk.npy', # change this to simple numpy array
+#     'pixel_size': [2.0, 0.53, 0.53],
+#     'coords': {'cancer_risk': [7, 132, 112, 450, 233, 490]},
+#     'clinical_txt': "No patient information available", #stays the same
+#     'question': 'Predict the lung cancer risk over six years.', #stays the same
+#     'config_file': 'config_files/config_m3mf_cancer_risk.py' #stays the same
+# }

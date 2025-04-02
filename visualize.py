@@ -105,7 +105,7 @@ def Visualize(model, data_dict, args):
     txt_token = 160
 
     patch_size = data_dict['patch_size']
-    img_size = data_dict['data'].shape[2:]
+    img_size = data_dict['image'].shape[2:]
     img_token_shape = [img_size[0]//patch_size[0], img_size[1]//patch_size[1], img_size[2]//patch_size[2]]
 
     img_token = product_of_list_elements(img_token_shape)
@@ -115,7 +115,7 @@ def Visualize(model, data_dict, args):
 
     model.eval()
     model.zero_grad()
-    img = data_dict['data']
+    img = data_dict['image']
 
     data_dict['attn_hook'] = True
     data_dict['require_attn_grad'] = require_attn_grad

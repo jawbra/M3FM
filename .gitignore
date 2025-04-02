@@ -1,0 +1,6 @@
+*.dcm
+nlst_data/*
+*.json
+*.npy
+*.ipynb
+demo_data/*

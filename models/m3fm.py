@@ -130,10 +130,10 @@ class M3FM(nn.Module):
 
     def load_data(self, data_dict):
 
-        if 'data' in data_dict.keys():
-            data = data_dict['data'].to(torch.float32).cuda(data_dict['gpu'], non_blocking=True)
+        if 'image' in data_dict.keys():
+            data = data_dict['image'].to(torch.float32).cuda(data_dict['gpu'], non_blocking=True)
             data = data.reshape([data.shape[0] * data.shape[1], 1, data.shape[2], data.shape[3], data.shape[4]])
-            data_dict['data'] = data
+            data_dict['image'] = data
 
         if 'size_embed' in data_dict.keys():
             size_embed = data_dict['size_embed'].to(torch.float32).cuda(data_dict['gpu'], non_blocking=True)
@@ -142,6 +142,7 @@ class M3FM(nn.Module):
 
         if 'txt_ids' in data_dict.keys():
             txt_ids = data_dict['txt_ids'].to(torch.long).cuda(data_dict['gpu'], non_blocking=True)
+            txt_ids = txt_ids.unsqueeze(0)
             txt_ids = txt_ids.reshape(txt_ids.shape[0] * txt_ids.shape[1], txt_ids.shape[-1])
             data_dict['txt_ids'] = txt_ids
             txt_mask = data_dict['txt_mask'].to(torch.long).cuda(data_dict['gpu'], non_blocking=True)
@@ -150,6 +151,8 @@ class M3FM(nn.Module):
 
         if 'questions_ids' in data_dict.keys():
             questions_ids = data_dict['questions_ids'].to(torch.long).cuda(data_dict['gpu'], non_blocking=True)
+            questions_ids = questions_ids.unsqueeze(0)
+
             questions_ids = questions_ids.reshape(questions_ids.shape[0] * questions_ids.shape[1],
                                                   questions_ids.shape[-1])
             data_dict['questions_ids'] = questions_ids
@@ -159,6 +162,7 @@ class M3FM(nn.Module):
 
         if 'label_mask' in data_dict.keys():
             label_mask = data_dict['label_mask'].to(torch.float32).cuda(data_dict['gpu'], non_blocking=True)
+            label_mask = label_mask.unsqueeze(0)
             label_mask = label_mask.reshape(label_mask.shape[0] * label_mask.shape[1], label_mask.shape[-1])
             data_dict['label_mask'] = label_mask
 
@@ -227,8 +231,8 @@ class M3FM(nn.Module):
             else:
                 attn_img_mask = None
 
-            if 'data' in data_dict.keys():
-                imgs = data_dict['data']
+            if 'image' in data_dict.keys():
+                imgs = data_dict['image']
                 if 'size_embed' in data_dict.keys():
                     size_embed = data_dict['size_embed']
                 else:
@@ -243,7 +247,7 @@ class M3FM(nn.Module):
             if isinstance(size_embed, torch.Tensor):
                 img_embeds = img_embeds + size_embed
 
-            if 'data' not in data_dict.keys():
+            if 'image' not in data_dict.keys():
                 assert 'txt_ids' in data_dict.keys()
                 img_embeds = (torch.zeros((data_dict['txt_ids'].shape[0], 9, self.embed_dim_img)).to(
                     torch.float32).cuda(data_dict['gpu'], non_blocking=True) + img_embeds) * 0.0
@@ -266,7 +270,7 @@ class M3FM(nn.Module):
 
             embeds_inputs.append(img_embeds)
 
-            if 'data' not in data_dict.keys():
+            if 'image' not in data_dict.keys():
                 attn_img_mask = torch.zeros(img_embeds.shape[0], img_embeds.shape[1]).to(img_embeds.device)
                 attn_img_mask = get_img_attention_mask(attn_img_mask)
 

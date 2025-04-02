@@ -3,6 +3,7 @@
 modalities = 'img,txt,task'
 model = 'm3fm_large'
 multi_task_head = "v2"
+lung_side = 'right'
 
 embed_dim = 1024
 
