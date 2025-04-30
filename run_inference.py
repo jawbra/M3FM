@@ -55,7 +55,17 @@ for left_entry, right_entry in zip(left_data, right_data):
         'cancer_risk': combined_risks,
         'pid': left_entry['pid'],
         'study': left_entry['study'],
-        'series': left_entry['series']
+        'series': left_entry['series'],
+        'exam': left_entry['exam'],
+        'accession': left_entry['accession'],
+        'screen_timepoint': left_entry['screen_timepoint'],
+        'device': left_entry['device'],
+        'institution': left_entry['institution'],
+        'cancer_laterality': left_entry['cancer_laterality'],
+        'y': left_entry['y'],
+        'time_at_event': left_entry['time_at_event'],
+        'y_seq': left_entry['y_seq'],
+        'y_mask': left_entry['y_mask']
     }
     
     combined_results.append(combined_entry)

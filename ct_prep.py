@@ -69,7 +69,7 @@ class ExtractPixelSpacingd(MapTransform):
         d = dict(data)
         # Get spacing from image metadata
         if "image_meta_dict" in d:
-            spacing = d["image_meta_dict"].get("spacing", [1.0, 1.0, 1.0])
+            spacing = d["image_meta_dict"].get("spacing", [1.4,1.4,2.5])
             # MONAI loader returns spacing as (w, h, d), we need (d, h, w)
             d["pixel_size"] = [spacing[2], spacing[1], spacing[0]] # here spacing is adjusted, since we reorient the image later in transfomrs by calling transforms.Orientationd
         return d
@@ -92,14 +92,16 @@ class CropResized(MapTransform):
 
     def compute_bbox(self, mask):
         """Compute bounding box coordinates from mask"""
+        
+        mask[mask == 1] = 0 # get rid of the hull
         # Select appropriate lung
         mask = mask.copy()
         if self.lung == 'right':
-            mask[mask < 3] = 0  # select right lung only
-            mask[mask >= 1] = 1
+            mask[mask < 4] = 0  # select right lung only
+            mask[mask >= 2] = 1
         else:
-            mask[mask > 2] = 0  # select left lung only
-            mask[mask >= 1] = 1
+            mask[mask > 3] = 0  # select left lung only
+            mask[mask >= 2] = 1
         
         # Find non-zero points
         points = np.array(np.where(mask > 0))
@@ -180,13 +182,13 @@ def get_dataloader(input_dict, args):
         transforms.LoadImaged(keys=['image', 'mask'], allow_missing_keys=True, meta_key_postfix="meta_dict", image_only=False),
         ExtractPixelSpacingd(keys=['image']),  # Extract pixel spacing after loading
         transforms.EnsureChannelFirstd(keys=['image', 'mask'], allow_missing_keys=True),
-        transforms.Orientationd(keys=["image", "mask"], allow_missing_keys=True, axcodes="RAI"),
+        #transforms.Orientationd(keys=["image", "mask"], allow_missing_keys=True, axcodes="RAI"),
         transforms.Transposed(keys=["image", "mask"], indices=(0, 3, 1, 2), allow_missing_keys=True),
         DefineEmbedDim(keys=['image'], embed_dim=1024, allow_missing_keys=True),
         SizeEmbed(keys=['image'], allow_missing_keys=True),
         ClinicalText(keys=['image'], question='Predict the lung cancer risk over six years.', clinical_text='No patient information available.', data_name='cancer_risk', allow_missing_keys=True),
-        transforms.Rotate90d(keys=["image", "mask"], k=1, spatial_axes=(1,2), allow_missing_keys=True),
-        transforms.ScaleIntensityRanged(keys=['image'], a_min=-1300, a_max=150, b_min=-1.0, b_max=1.0, clip=True),
+        #transforms.Rotate90d(keys=["image", "mask"], k=1, spatial_axes=(1,2), allow_missing_keys=True),
+        #transforms.ScaleIntensityRanged(keys=['image'], a_min=-1300, a_max=150, b_min=-1.0, b_max=1.0, clip=True),
         # transforms.CropForegroundd(keys=['image', 'mask'], source_key='mask', margin=0),
         # transforms.Resized(keys=['image', 'mask'], spatial_size=(128,320,448)),
         CropResized(keys=['image', 'mask'], crop_size=(128, 448, 320), lung=args.lung_side),
@@ -195,11 +197,11 @@ def get_dataloader(input_dict, args):
     ])
 
 
-    with open('/home/brandtj/Documents/projects/iderha/M3FM/data/dataset.json', 'r') as f:
+    with open('/mnt/nlst_data/npy/test_vital_25.json', 'r') as f:
         data_dict = json.load(f)
-    data_dict = data_dict['testing']  # Use the training set
+    # data_dict = data_dict['testing']  # Use the training set
     data = Dataset(data=data_dict, transform=train_transforms)
-    loader = DataLoader(data, batch_size=1)
+    loader = DataLoader(data, batch_size=1, shuffle=False, num_workers=18, pin_memory=True, prefetch_factor=8)
 
     return loader, input_dict
 

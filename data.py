@@ -10,31 +10,31 @@ import numpy as np
 from monai.transforms import MapTransform
 import json
 
-class ExtractPixelSpacingd(MapTransform):
+class AddPixelSpacingd(MapTransform):
     def __init__(self, keys, allow_missing_keys=False):
         super().__init__(keys, allow_missing_keys)
     
     def __call__(self, data):
         d = dict(data)
         # Get spacing from image metadata
-        if "image_meta_dict" in d:
-            spacing = d["image_meta_dict"].get("spacing", [1.0, 1.0, 1.0])
-            # MONAI loader returns spacing as (w, h, d), we need (d, h, w)
-            d["pixel_size"] = [spacing[2], spacing[1], spacing[0]] # here spacing is adjusted, since we reorient the image later in transfomrs by calling transforms.Orientationd
+        # if "image_meta_dict" in d:
+        #     spacing = d["image_meta_dict"].get("spacing", [1.0, 1.0, 1.0]) d[1.4 , 1.4 , 2.5]
+        #     # MONAI loader returns spacing as (w, h, d), we need (d, h, w)
+        d["pixel_size"] = [1.4,1.4,2.5] # here spacing is adjusted, since we reorient the image later in transfomrs by calling transforms.Orientationd
         return d
     
-class Add(MapTransform):
-    def __init__(self, keys, allow_missing_keys=False):
-        super().__init__(keys, allow_missing_keys)
+# class Add(MapTransform):
+#     def __init__(self, keys, allow_missing_keys=False):
+#         super().__init__(keys, allow_missing_keys)
     
-    def __call__(self, data):
-        d = dict(data)
-        # Get spacing from image metadata
-        if "image_meta_dict" in d:
-            spacing = d["image_meta_dict"].get("spacing", [1.0, 1.0, 1.0])
-            # MONAI loader returns spacing as (w, h, d), we need (d, h, w)
-            d["pixel_size"] = [spacing[2], spacing[1], spacing[0]] # here spacing is adjusted, since we reorient the image later in transfomrs by calling transforms.Orientationd
-        return d
+#     def __call__(self, data):
+#         d = dict(data)
+#         # Get spacing from image metadata
+#         if "image_meta_dict" in d:
+#             spacing = d["image_meta_dict"].get("spacing", [1.0, 1.0, 1.0])
+#             # MONAI loader returns spacing as (w, h, d), we need (d, h, w)
+#             d["pixel_size"] = [spacing[2], spacing[1], spacing[0]] # here spacing is adjusted, since we reorient the image later in transfomrs by calling transforms.Orientationd
+#         return d
 
 class CropResized(MapTransform):
     """
@@ -240,8 +240,8 @@ def get_data(input_dict, args):
 
 def get_dataloader(input_dict, args):
     train_transforms = transforms.Compose([
-        transforms.LoadImaged(keys=['image', 'mask'], allow_missing_keys=True, meta_key_postfix="meta_dict", image_only=False),
-        ExtractPixelSpacingd(keys=['image']),  # Extract pixel spacing after loading
+        transforms.LoadImaged(keys=['image', 'mask'], allow_missing_keys=True, image_only=False),
+        AddPixelSpacingd(keys=['image']),  # Extract pixel spacing after loading
         transforms.EnsureChannelFirstd(keys=['image', 'mask'], allow_missing_keys=True),
         transforms.Orientationd(keys=["image", "mask"], allow_missing_keys=True, axcodes="RAI"),
         transforms.Transposed(keys=["image", "mask"], indices=(0, 3, 1, 2), allow_missing_keys=True),

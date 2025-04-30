@@ -6,6 +6,7 @@ from ct_prep import get_dataloader
 import numpy as np
 import matplotlib.pyplot as plt
 import json
+from tqdm import tqdm
 
 def convert_to_json_serializable(obj):
     if isinstance(obj, np.ndarray):
@@ -50,7 +51,7 @@ def Inference(input_data, vis=False):
     ## this is the point were we need to change the code
 
     data_loader, input_dict = get_dataloader(input_data, args)
-    for batch in data_loader:
+    for batch in tqdm(data_loader):
 
         batch['gpu'] = args.gpu
         batch['data_name'] = [args.data_name]
@@ -73,9 +74,24 @@ def Inference(input_data, vis=False):
                 output_dict[k] = list(v.cpu().squeeze().numpy())
 
             #print(output_dict)
-            output_dict['pid'] = batch['image_meta_dict']['filename_or_obj'][0].split('/')[-3]
-            output_dict['study'] = batch['image_meta_dict']['filename_or_obj'][0].split('/')[-2]
-            output_dict['series'] = batch['image_meta_dict']['filename_or_obj'][0].split('/')[-1]
+            output_dict.update({
+                'pid': batch['pid'][0],
+                'study': batch['study'][0],
+                'series': batch['series'][0],
+                'exam': batch['exam'][0],
+                'accession': batch['accession'][0],
+                'screen_timepoint': int(batch['screen_timepoint'][0]),
+                'device': int(batch['device'][0]),
+                'institution': batch['institution'][0],
+                'cancer_laterality': [
+                    int(batch['cancer_laterality'][0][0]),
+                    bool(batch['cancer_laterality'][1][0])
+                ],
+                'y': int(batch['y'][0]),
+                'time_at_event': int(batch['time_at_event'][0]),
+                'y_seq': [int(y) for y in batch['y_seq'][0]],
+                'y_mask': [int(y) for y in batch['y_mask'][0]]
+            })
 
             collect_predictions.append(output_dict)
     def convert_to_json_serializable(obj):
