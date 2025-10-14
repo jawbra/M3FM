@@ -32,7 +32,7 @@ def get_lung_config(lung_side):
         return {
             'clinical_txt': "No patient information available.",
             'question': 'Predict the lung cancer risk over six years.',
-            'config_file': 'config_files/config_m3mf_cancer_risk_right.py',
+            'config_file': 'config_files/config_m3mf_cancer_risk.py',
         }
     else:
         raise ValueError(f"Invalid lung_side: {lung_side}. Must be 'left' or 'right'")

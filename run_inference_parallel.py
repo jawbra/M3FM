@@ -1,23 +1,40 @@
 #!/usr/bin/env python3
 """
 Lung Cancer Risk Inference Script
-Updated to support parallel execution
+Support for parallel execution of left/right lung inference
 
-Usage Examples:
-  # For parallel execution in separate terminals:
-  Terminal 1: python run_inference.py left
-  Terminal 2: python run_inference.py right
-  
-  # For sequential execution:
-  python run_inference.py both
-  python run_inference.py both --combine
+Usage:
+  python run_inference.py left    # Run left lung only
+  python run_inference.py right   # Run right lung only  
+  python run_inference.py both    # Run both lungs sequentially
+  python run_inference.py both --combine  # Run both and combine results
 """
 
 from inference_monai import Inference
+import matplotlib.pyplot as plt
+import numpy as np
 import json
 import logging
 from datetime import datetime
 import argparse
+import sys
+
+
+def show_image_att(imgs, img_atts):
+    """Display image attention visualization"""
+    for s in range(0, imgs.shape[0], 4):
+        img = imgs[s]
+        img_att = img_atts[s]
+        fig, axs = plt.subplots(1, 2)
+        img = (img - img.min()) / (img.max() - img.min())
+        img = np.array([img, img, img]).transpose([1, 2, 0])
+        axs[0].imshow(img)
+        axs[0].axis('off')
+
+        axs[1].imshow(img_att)
+        axs[1].axis('off')
+        plt.savefig(f'output{s}.png')
+    plt.show()
 
 
 def get_lung_config(lung_side):
@@ -32,7 +49,7 @@ def get_lung_config(lung_side):
         return {
             'clinical_txt': "No patient information available.",
             'question': 'Predict the lung cancer risk over six years.',
-            'config_file': 'config_files/config_m3mf_cancer_risk_right.py',
+            'config_file': 'config_files/config_m3mf_cancer_risk.py',
         }
     else:
         raise ValueError(f"Invalid lung_side: {lung_side}. Must be 'left' or 'right'")
@@ -76,9 +93,20 @@ def run_single_lung_inference(lung_side):
         predictions, failed = Inference(input_data, vis=False)
         
         logging.info(f"{lung_side.title()} lung: {len(predictions)} successful, {len(failed)} failed")
-        logging.info(f"{lung_side.title()} lung inference completed successfully")
         
-        return predictions, failed
+        # The Inference function should have created the output file
+        output_file = f'output_{lung_side}.json'
+        try:
+            with open(output_file, 'r') as f:
+                data = json.load(f)
+            logging.info(f"Loaded {len(data)} predictions from {output_file}")
+        except FileNotFoundError:
+            logging.error(f"{lung_side.title()} lung output file not found: {output_file}")
+            logging.info(f"Using in-memory results: {len(predictions)} predictions")
+            data = predictions
+        
+        logging.info(f"{lung_side.title()} lung inference completed successfully")
+        return data, failed
         
     except Exception as e:
         logging.error(f"Critical error during {lung_side} lung inference: {str(e)}")
@@ -98,7 +126,7 @@ def combine_results():
         logging.info(f"Loaded {len(left_data)} left lung predictions")
     except FileNotFoundError:
         logging.error("Left lung output file not found")
-        return None, None
+        return None
     
     try:
         with open('output_right.json', 'r') as f:
@@ -106,7 +134,7 @@ def combine_results():
         logging.info(f"Loaded {len(right_data)} right lung predictions")
     except FileNotFoundError:
         logging.error("Right lung output file not found")
-        return None, None
+        return None
     
     # Create dictionaries for quick lookup by series ID
     left_dict = {entry['series']: entry for entry in left_data}
@@ -167,6 +195,50 @@ def combine_results():
     return combined_results, partial_results
 
 
+def run_both_lungs_sequential(combine_results_flag=True):
+    """Run both lungs sequentially (original behavior)"""
+    
+    # Setup main logging
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Clear any existing handlers
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+        
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(f'combined_inference_{timestamp}.log'),
+            logging.StreamHandler()
+        ]
+    )
+
+    logging.info("Starting combined left/right lung inference pipeline")
+
+    try:
+        # Run inference for each lung with appropriate config
+        logging.info("=== Starting LEFT lung inference ===")
+        left_data, left_failed = run_single_lung_inference('left')
+        
+        logging.info("=== Starting RIGHT lung inference ===")
+        right_data, right_failed = run_single_lung_inference('right')
+        
+        logging.info(f"Left lung: {len(left_data)} successful, {len(left_failed)} failed")
+        logging.info(f"Right lung: {len(right_data)} successful, {len(right_failed)} failed")
+        
+        # Combine results if requested
+        if combine_results_flag:
+            combined_results, partial_results = combine_results()
+            return combined_results, partial_results
+        else:
+            return left_data, right_data
+            
+    except Exception as e:
+        logging.error(f"Critical error during inference: {str(e)}")
+        raise e
+
+
 def main():
     """Main function with command line argument parsing"""
     parser = argparse.ArgumentParser(description='Run lung cancer risk inference')
@@ -179,53 +251,26 @@ def main():
     
     args = parser.parse_args()
     
-    print(f"🚀 Starting {args.lung_side} lung inference...")
-    
     if args.lung_side == 'both':
-        # Setup combined logging
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        for handler in logging.root.handlers[:]:
-            logging.root.removeHandler(handler)
-            
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(f'combined_inference_{timestamp}.log'),
-                logging.StreamHandler()
-            ]
-        )
-        
-        logging.info("Starting combined left/right lung inference pipeline")
-        
         # Run both lungs sequentially
-        logging.info("=== Starting LEFT lung inference ===")
-        left_predictions, left_failed = run_single_lung_inference('left')
-        
-        logging.info("=== Starting RIGHT lung inference ===")
-        right_predictions, right_failed = run_single_lung_inference('right')
-        
-        print(f"📊 Left lung: {len(left_predictions)} successful, {len(left_failed)} failed")
-        print(f"📊 Right lung: {len(right_predictions)} successful, {len(right_failed)} failed")
-        
-        # Combine results if requested
+        results = run_both_lungs_sequential(args.combine)
         if args.combine:
-            combined_results, partial_results = combine_results()
-            if combined_results is not None:
-                print(f"✅ Combined inference completed!")
-                print(f"📊 Complete results (both lungs): {len(combined_results)}")
-                print(f"📊 Partial results (single lung): {len(partial_results) if partial_results else 0}")
-                print(f"📁 Combined output: output_combined.json")
+            combined_results, partial_results = results
+            print(f"✅ Combined inference completed!")
+            print(f"📊 Complete results (both lungs): {len(combined_results)}")
+            print(f"📊 Partial results (single lung): {len(partial_results)}")
+            print(f"📁 Combined output: output_combined.json")
         else:
-            print(f"✅ Both lungs inference completed!")
+            left_data, right_data = results
+            print(f"✅ Both lung inference completed!")
+            print(f"📊 Left lung results: {len(left_data)}")
+            print(f"📊 Right lung results: {len(right_data)}")
             print(f"📁 Outputs: output_left.json, output_right.json")
-            print("💡 Use --combine flag to merge results")
-            
     else:
         # Run single lung (for parallel execution)
-        predictions, failed = run_single_lung_inference(args.lung_side)
+        data, failed = run_single_lung_inference(args.lung_side)
         print(f"✅ {args.lung_side.title()} lung inference completed!")
-        print(f"📊 Successful predictions: {len(predictions)}")
+        print(f"📊 Successful predictions: {len(data)}")
         print(f"📊 Failed samples: {len(failed)}")
         print(f"📁 Output saved to: output_{args.lung_side}.json")
 

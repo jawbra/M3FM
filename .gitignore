@@ -4,3 +4,7 @@ nlst_data/*
 *.npy
 *.ipynb
 demo_data/*
+transfer_nlst_data.sh
+transfer_nlst_masks.sh
+resume_nlst_masks.sh
+resume_nlst_transfer.sh

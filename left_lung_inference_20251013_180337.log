@@ -1,0 +1,97 @@
+2025-10-13 18:03:37,909 - INFO - Starting LEFT lung inference pipeline
+2025-10-13 18:03:37,909 - INFO - Config file: config_files/config_m3mf_cancer_risk_left.py
+2025-10-13 18:03:37,910 - INFO - Starting inference for left lung
+2025-10-13 18:03:42,670 - INFO - Successfully loaded dataloader with 6431 samples
+2025-10-13 18:29:14,634 - ERROR - Failed processing sample 666 (PID: 117053, Path: /mnt/external_ssd/NLST/nlst_dicom/test/117053/1.2.840.113654.2.55.15745328929737841275283852673645255843/1.2.840.113654.2.55.66988371419442447447579913866079459764): Caught RuntimeError in DataLoader worker process 2.
+Original Traceback (most recent call last):
+  File "/home/brandtj/Documents/projects/iderha/M3FM/ct_prep.py", line 275, in __call__
+    transformed_data, new_pix_size = self.crop_resize(data_array[0], coords, pix_size, self.crop_size)
+  File "/home/brandtj/Documents/projects/iderha/M3FM/ct_prep.py", line 232, in crop_resize
+    raise ValueError(f"Invalid cropped image dimensions: (D: {crop_s}, H: {crop_h}, W: {crop_w}). "
+ValueError: Invalid cropped image dimensions: (D: 0, H: 225, W: 337). Cannot interpolate to target size (D: 128, H: 448, W: 320)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/brandtj/miniconda3/envs/M3FM/lib/python3.9/site-packages/monai/transforms/transform.py", line 150, in apply_transform
+    return _apply_transform(transform, data, unpack_items, lazy, overrides, log_stats)
+  File "/home/brandtj/miniconda3/envs/M3FM/lib/python3.9/site-packages/monai/transforms/transform.py", line 98, in _apply_transform
+    return transform(data, lazy=lazy) if isinstance(transform, LazyTrait) else transform(data)
+  File "/home/brandtj/Documents/projects/iderha/M3FM/ct_prep.py", line 291, in __call__
+    raise RuntimeError(f"CropResized transform failed for {self.lung} lung{sample_info}: {str(e)}")
+RuntimeError: CropResized transform failed for left lung (sample: tensor([[[[0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          ...,
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903]],
+
+         [[0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          ...,
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903]],
+
+         [[0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          ...,
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903]],
+
+         ...,
+
+         [[0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          ...,
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903]],
+
+         [[0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          ...,
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903]],
+
+         [[0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          ...,
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903],
+          [0.1903, 0.1903, 0.1903,  ..., 0.1903, 0.1903, 0.1903]]]])): Invalid cropped image dimensions: (D: 0, H: 225, W: 337). Cannot interpolate to target size (D: 128, H: 448, W: 320)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/brandtj/miniconda3/envs/M3FM/lib/python3.9/site-packages/torch/utils/data/_utils/worker.py", line 351, in _worker_loop
+    data = fetcher.fetch(index)  # type: ignore[possibly-undefined]
+  File "/home/brandtj/miniconda3/envs/M3FM/lib/python3.9/site-packages/torch/utils/data/_utils/fetch.py", line 52, in fetch
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/brandtj/miniconda3/envs/M3FM/lib/python3.9/site-packages/torch/utils/data/_utils/fetch.py", line 52, in <listcomp>
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/brandtj/miniconda3/envs/M3FM/lib/python3.9/site-packages/monai/data/dataset.py", line 109, in __getitem__
+    return self._transform(index)
+  File "/home/brandtj/miniconda3/envs/M3FM/lib/python3.9/site-packages/monai/data/dataset.py", line 95, in _transform
+    return self.transform(data_i)
+  File "/home/brandtj/miniconda3/envs/M3FM/lib/python3.9/site-packages/monai/transforms/compose.py", line 346, in __call__
+    result = execute_compose(
+  File "/home/brandtj/miniconda3/envs/M3FM/lib/python3.9/site-packages/monai/transforms/compose.py", line 116, in execute_compose
+    data = apply_transform(
+  File "/home/brandtj/miniconda3/envs/M3FM/lib/python3.9/site-packages/monai/transforms/transform.py", line 180, in apply_transform
+    raise RuntimeError(f"applying transform {transform}") from e
+RuntimeError: applying transform <ct_prep.CropResized object at 0x7394680a25b0>
+
+2025-10-13 21:46:58,436 - INFO - Inference completed: 6430 successful, 1 failed
+2025-10-13 21:46:58,652 - INFO - Saved 6430 predictions to output_left.json
+2025-10-13 21:46:58,652 - INFO - Saved 1 failed file records to failed_files_left_20251013_214658.txt and failed_files_left_20251013_214658.json
+2025-10-13 21:46:58,652 - INFO - Left lung: 6430 successful, 1 failed
+2025-10-13 21:46:58,652 - INFO - Left lung inference completed successfully
