@@ -52,7 +52,11 @@ def Inference(input_data, vis=False):
 
     data_loader, input_dict = get_dataloader(input_data, args)
     for batch in tqdm(data_loader):
-
+        
+        # Skip if batch is None (all items failed in transform)
+        if batch is None:
+            continue
+            
         batch['gpu'] = args.gpu
         batch['data_name'] = [args.data_name]
 
@@ -78,11 +82,7 @@ def Inference(input_data, vis=False):
                 'pid': batch['pid'][0],
                 'study': batch['study'][0],
                 'series': batch['series'][0],
-                'exam': batch['exam'][0],
-                'accession': batch['accession'][0],
                 'screen_timepoint': int(batch['screen_timepoint'][0]),
-                'device': int(batch['device'][0]),
-                'institution': batch['institution'][0],
                 'cancer_laterality': [
                     int(batch['cancer_laterality'][0][0]),
                     bool(batch['cancer_laterality'][1][0])
@@ -111,7 +111,7 @@ def Inference(input_data, vis=False):
     ]
 
     #save as json
-    with open(f'output_{args.lung_side}.json', 'w') as f:
+    with open(f'output_{args.lung_side}_npy.json', 'w') as f:
         json.dump(collect_predictions, f, indent=4)
 
             #return output_dict
